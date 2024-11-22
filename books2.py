@@ -1,10 +1,17 @@
 from typing import Optional
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 from uuid import UUID
+from starlette.responses import JSONResponse
 
 
 app = FastAPI()
+
+
+class NegativeNumberException(Exception):
+    def __init__(self, books_to_return):
+        self.books_to_return = books_to_return
+
 
 class Book(BaseModel):
     id : UUID
@@ -30,6 +37,18 @@ class Book(BaseModel):
 
 BOOKS = []
 
+
+@app.exception_handle(NegativeNumberException)
+async def negative_number_exception_handler(request: Request, exception: NegativeNumberException):
+    return JSONResponse(
+        status_code=418,
+        content= {
+            "message": f"Hey, why do you want {exception.books_to_return} books? You need to read more!"
+        }
+    )
+
+
+
 @app.get("/")
 async def get_all_books(books_to_return : Optional[int] = None):
     if len(BOOKS)<1:
@@ -49,7 +68,7 @@ async def get_book_by_id(book_id : UUID):
     for x in BOOKS:
         if x.id == book_id:
             return x
-
+    raise item_cannot_be_found_exception()
 
 @app.post("/book")
 async def create_book(book: Book):
@@ -64,7 +83,7 @@ async def update_book(book_id: UUID, book: Book):
         if x.id == book_id:
             BOOKS[counter - 1] = book
             return BOOKS[counter - 1]
-
+    raise item_cannot_be_found_exception()
 
 @app.delete("/book/{book_id}")
 async def delete_book(book_id: UUID):
@@ -74,6 +93,11 @@ async def delete_book(book_id: UUID):
         if x.id == book_id:
             del BOOKS[counter - 1]
             return f'ID: {book_id} has been deleted'
+    
+    # raise HTTPException(status_code=400, detail="Id not found",
+    #                     headers={"X-Header-Error" : "Nothing to be seen at the UUID"}
+    #                     )
+    raise item_cannot_be_found_exception()
 
 # @app.post("/book")
 # async def create_book(book: Book):
@@ -120,3 +144,11 @@ def create_book_no_api():
     BOOKS.append(book_4)
 
     return BOOKS
+
+
+def item_cannot_be_found_exception():
+    raise HTTPException(status_code=400, detail="Id not found",
+                        headers={"X-Header-Error" : 
+                                "Nothing to be seen at the UUID"
+                                }
+                        )
